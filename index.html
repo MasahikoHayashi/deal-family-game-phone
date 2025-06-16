@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connections Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Aligns to top, which is better for longer content */
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            font-size: 16px; /* Base font size for rem calculations */
+        }
+        .game-container {
+            background-color: #ffffff;
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            max-width: 900px;
+            width: 100%;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+            position: relative;
+        }
+        .puzzle-creation-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+        .puzzle-creation-section label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .puzzle-creation-section textarea,
+        .puzzle-creation-section input[type="text"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+            transition: border-color 0.2s;
+        }
+        .puzzle-creation-section textarea:focus,
+        .puzzle-creation-section input[type="text"]:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3);
+        }
+        .group-input-area {
+            display: grid;
+            grid-template-columns: 1fr; /* Default to single column for mobile first */
+            gap: 1rem;
+        }
+        @media (min-width: 768px) { /* Adjust breakpoint for larger screens */
+            .group-input-area {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        .group-item-input {
+            border: 1px solid #e0e0e0;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            background-color: #f8fafc;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .word-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 9px;
+            margin-top: 1.5rem;
+            margin-bottom: 2rem;
+            max-width: 530px; /* Still useful for desktop, will be overridden for mobile */
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .word-item {
+            background-color: #e0e7ff;
+            border-radius: 0.5625rem;
+            font-size: 0.84375rem; /* ~13.5px */
+            font-weight: 600;
+            color: #3b82f6;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            user-select: none;
+            border: 0.75px solid #bfdbfe;
+            box-shadow: 0 1.5px 3.75px rgba(0, 0, 0, 0.05);
+            
+            aspect-ratio: 1 / 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            word-break: break-word;
+            padding: 5px; /* Add some padding to ensure text doesn't hit edges */
+        }
+        .word-item:hover {
+            background-color: #c7d2fe;
+            transform: translateY(-2px);
+            box-shadow: 0 3px 7.5px rgba(0, 0, 0, 0.1);
+        }
+        .word-item.selected {
+            background-color: #60a5fa;
+            color: #ffffff;
+            border-color: #3b82f6;
+        }
+        .word-item.guessed {
+            pointer-events: none;
+            opacity: 0.6;
+            background-color: #d1d5db;
+            color: #6b7280;
+            border-color: #9ca3af;
+            box-shadow: none;
+        }
+        /* Colors for correct groups (dynamic CSS variables used in JS) */
+        :root {
+            --group-0-bg: #fffbeb;    /* 黄色系の背景色 */
+            --group-0-text: #f59e0b;  /* 黄色系のテキスト色 */
+            --group-0-border: #fcd34d; /* 黄色系のボーダー色 */
+
+            --group-1-bg: #dcfce7;    /* 緑系の背景色 */
+            --group-1-text: #16a34a;  /* 緑系のテキスト色 */
+            --group-1-border: #86efac; /* 緑系のボーダー色 */
+
+            --group-2-bg: #eff6ff;
+            --group-2-text: #2563eb;
+            --group-2-border: #93c5fd;
+
+            --group-3-bg: #f3e8ff;
+            --group-3-text: #9333ea;
+            --group-3-border: #d8b4fe;
+        }
+
+        .group-item {
+            padding: 0.75rem;
+            border-radius: 0.5625rem;
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 3px 4.5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 9px;
+            grid-column: span 4; 
+        }
+        .group-item .category-title {
+            font-size: 0.84375rem; /* ~13.5px */
+            margin-bottom: 0.1875rem;
+        }
+        .group-item .word-display {
+            font-size: 0.7125rem; /* ~11.4px, quite small for words */
+            font-weight: normal;
+        }
+
+        .input-area {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+        .input-area button {
+            padding: 0.5625rem 1.125rem;
+            border-radius: 0.5625rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 3px 4.5px rgba(0, 0, 0, 0.1);
+            min-width: 100px; /* Ensure buttons have a minimum tap area */
+        }
+        .create-puzzle-button, .submit-button {
+            background-image: linear-gradient(to right top, #6366f1, #3b82f6);
+            color: white;
+            border: none;
+        }
+        .create-puzzle-button:hover:not(:disabled), .submit-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4.5px 7.5px rgba(0, 0, 0, 0.15);
+        }
+        .create-puzzle-button:disabled, .submit-button:disabled {
+            background-color: #cbd5e1;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .shuffle-button {
+            background-color: #f0f4f8;
+            color: #4b5563;
+            border: 0.75px solid #d1d5db;
+        }
+        .shuffle-button:hover {
+            background-color: #e2e8f0;
+        }
+        .clear-button {
+            background-color: #fee2e2;
+            color: #dc2626;
+            border: 0.75px solid #fca5a5;
+        }
+        .clear-button:hover {
+            background-color: #fecaca;
+        }
+        .message-box {
+            /* Initial state */
+            min-height: 50px; /* This is for the container */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 0;
+            padding: 0;
+            border: none;
+            box-shadow: none;
+            overflow: hidden;
+            transition: height 0.3s ease;
+            text-align: center; /* Center the message text */
+            font-weight: 600;
+        }
+        .message-box.active {
+            height: 50px;
+            padding: 1rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        .message-box.incorrect.active {
+            height: 50px;
+            padding: 1rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .play-again-button {
+            margin-top: 2rem;
+            background-image: linear-gradient(to right top, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.9375rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            box-shadow: 0 3px 7.5px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease-in-out;
+        }
+        .play-again-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4.5px 11.25px rgba(0, 0, 0, 0.15);
+        }
+        .category-list {
+            margin-top: 1.5rem;
+            text-align: left;
+            padding: 1rem;
+            background-color: #f8fafc;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+        }
+        .category-list h3 {
+            font-weight: 700;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        .category-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        .category-color-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 0.375rem;
+            margin-right: 0.75rem;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Renamed from #close-message to #game-status-message for clarity based on JS usage */
+        #game-status-message { 
+            display: block; /* Make it a block element to center text properly */
+            font-size: 1rem; /* More readable default size */
+            font-weight: 600;
+            /* Removed margin-left as it's now block level and centered by message-box */
+            color: #333; /* Default color */
+        }
+        
+        /* Mobile specific adjustments */
+        @media (max-width: 640px) {
+            body {
+                padding: 10px; /* Reduce overall padding on very small screens */
+            }
+            .game-container {
+                padding: 1rem; /* Further reduce padding inside container */
+                border-radius: 0.75rem; /* Smaller border radius */
+            }
+            h1 {
+                font-size: 1.75rem; /* Make main title a bit larger */
+            }
+            .text-xl { /* Adjust for "Create four groups of four!" */
+                font-size: 1.125rem; /* Reduce font size for this paragraph for smaller screens */
+            }
+            .puzzle-creation-section h2 { /* Targeting the "Puzzle creation" title */
+                 font-size: 1.5rem; /* Make it more readable on mobile */
+            }
+            .group-item-input {
+                padding: 0.75rem; /* Slightly less padding */
+            }
+            .group-item-input label {
+                font-size: 0.9rem; /* Slightly smaller label font */
+            }
+            .group-item-input input[type="text"] {
+                font-size: 0.9rem; /* Slightly smaller input font */
+            }
+            
+            .word-grid {
+                grid-template-columns: repeat(4, 1fr); /* Keep 4 columns */
+                gap: 5px; /* Slightly smaller gap */
+                max-width: unset; /* Remove max-width to allow it to fill container */
+                width: 100%; /* Ensure it takes full available width */
+            }
+            .word-item {
+                font-size: 0.75rem; /* Increased from 0.675rem to 0.75rem (12px) for better readability */
+                border-radius: 0.4rem; /* Slightly smaller border radius for words */
+            }
+            .input-area button {
+                padding: 0.6rem 1rem; /* Increased padding for better tap target */
+                font-size: 0.8rem; /* Increased font size for buttons */
+                min-width: 80px; /* Maintain minimum tap area */
+            }
+            .create-puzzle-button, .play-again-button {
+                padding: 0.7rem 1.2rem; /* Consistent padding for main action buttons */
+                font-size: 0.9rem; /* Consistent font size */
+            }
+            .message-box {
+                font-size: 0.85rem; /* Make message box text more readable */
+                padding: 0.75rem; /* Adjust padding */
+                min-height: 40px; /* Reduce minimum height if needed */
+            }
+            #game-status-message {
+                font-size: 0.9rem; /* Ensure message text is readable */
+                margin-left: 0; /* Remove specific margin-left as it's now block */
+            }
+            .group-item .category-title {
+                font-size: 0.8rem; /* Consistent with word item font size */
+            }
+            .group-item .word-display {
+                font-size: 0.65rem; /* Still a bit small, but for lists of words, common */
+            }
+            .play-again-button {
+                margin-top: 1.5rem; /* Reduce margin-top slightly */
+            }
+        }
+
+        /* Further refinement for extremely small screens (e.g., iPhone SE) */
+        @media (max-width: 375px) {
+            .game-container {
+                padding: 0.75rem;
+            }
+            .word-grid {
+                gap: 4px; /* Even smaller gap for very tight screens */
+            }
+            .word-item {
+                font-size: 0.7rem; /* Slight reduction for very small screens */
+            }
+            .input-area button {
+                padding: 0.5rem 0.8rem;
+                font-size: 0.75rem;
+                min-width: 70px;
+            }
+            .create-puzzle-button, .play-again-button {
+                padding: 0.6rem 1rem;
+                font-size: 0.8rem;
+            }
+            .puzzle-creation-section h2 {
+                font-size: 1.35rem;
+            }
+            .group-item .category-title {
+                font-size: 0.75rem;
+            }
+            .group-item .word-display {
+                font-size: 0.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Connections</h1>
+        <div id="puzzle-creation-section" class="puzzle-creation-section">
+            <h2 class="2xl:text-3xl lg:text-2xl md:text-xl sm:text-lg text-lg font-bold text-gray-700 mb-4">Puzzle creation</h2>
+
+            <div class="group-input-area">
+                <div class="group-item-input">
+                    <label for="group1-words">Easy 4 words:</label>
+                    <input type="text" id="group1-words" placeholder="Ex: apple, banana, grape, orange">
+                    <label for="group1-category" class="mt-2">Group name:</label>
+                    <input type="text" id="group1-category" placeholder="Ex: fruits">
+                </div>
+                <div class="group-item-input">
+                    <label for="group2-words">Medium 4 words:</label>
+                    <input type="text" id="group2-words" placeholder="Ex: cat, dog, bird, fish">
+                    <label for="group2-category" class="mt-2">Group name:</label>
+                    <input type="text" id="group2-category" placeholder="Ex: pets">
+                </div>
+                <div class="group-item-input">
+                    <label for="group3-words">Hard 4 words:</label>
+                    <input type="text" id="group3-words" placeholder="Ex: red, blue, green, yellow">
+                    <label for="group3-category" class="mt-2">Group name:</label>
+                    <input type="text" id="group3-category" placeholder="Ex: color">
+                </div>
+                <div class="group-item-input">
+                    <label for="group4-words">Expert 4 words:</label>
+                    <input type="text" id="group4-words" placeholder="Ex: chair, table, sofa, bed">
+                    <label for="group4-category" class="mt-2">Group name:</label>
+                    <input type="text" id="group4-category" placeholder="Ex: furniture">
+                </div>
+            </div>
+
+            <button id="create-puzzle-button" class="create-puzzle-button mt-4">Create a puzzle</button>
+            <p id="puzzle-error-message" class="text-red-500 mt-2 hidden"></p>
+        </div>
+
+        <div id="game-play-section" class="hidden">
+            <p class="text-gray-600 mb-8 font-bold text-xl">
+                Create four groups of four! 
+            </p>
+            <div id="message-container" style="min-height: 1.5em; text-align: center; margin-bottom: 1em;">
+                 <span id="game-status-message" class="hidden"></span>
+            </div>
+            
+            <div id="word-grid" class="word-grid">
+                </div>
+
+            <div class="input-area">
+                <button id="shuffle-button" class="shuffle-button">Shuffle</button>
+                <button id="clear-button" class="clear-button">Deselect All</button>
+                <button id="submit-button" class="submit-button">Submit</button>
+            </div>
+
+            <button id="play-again-button" class="play-again-button hidden">One more play</button>
+        </div>
+    </div>
+
+    <script>
+        let currentPuzzle = {};
+        let shuffledWords = [];
+        let selectedWords = [];
+        let incorrectGuesses = 0;
+        let correctGroupsCount = 0;
+        let guessedGroupsIndices = [];
+        
+        // ここが変更されています: グループ0に黄色、グループ1に緑を割り当て
+        const groupColors = [
+            { bg: '#fffbeb', text: '#f59e0b', border: '#fcd34d' }, // グループ0 (易しい): 黄色
+            { bg: '#dcfce7', text: '#16a34a', border: '#86efac' }, // グループ1 (普通): 緑
+            { bg: '#eff6ff', text: '#2563eb', border: '#93c5fd' }, // グループ2 (難しい): 青
+            { bg: '#f3e8ff', text: '#9333ea', border: '#d8b4fe' }  // グループ3 (エキスパート): 紫
+        ];
+
+        const puzzleCreationSection = document.getElementById('puzzle-creation-section');
+        const groupWordsInputs = [
+            document.getElementById('group1-words'),
+            document.getElementById('group2-words'),
+            document.getElementById('group3-words'),
+            document.getElementById('group4-words')
+        ];
+        const groupCategoryInputs = [
+            document.getElementById('group1-category'),
+            document.getElementById('group2-category'),
+            document.getElementById('group3-category'),
+            document.getElementById('group4-category')
+        ];
+        const createPuzzleButton = document.getElementById('create-puzzle-button');
+        const puzzleErrorMessage = document.getElementById('puzzle-error-message');
+
+        const gamePlaySection = document.getElementById('game-play-section');
+        const wordGrid = document.getElementById('word-grid');
+        const submitButton = document.getElementById('submit-button');
+        const shuffleButton = document.getElementById('shuffle-button');
+        const clearButton = document.getElementById('clear-button');
+        const playAgainButton = document.getElementById('play-again-button');
+        const gameStatusMessageElement = document.getElementById('game-status-message'); // Renamed variable
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function initializeGame() {
+            selectedWords = [];
+            incorrectGuesses = 0;
+            correctGroupsCount = 0;
+            guessedGroupsIndices = [];
+            
+            submitButton.disabled = true;
+            shuffleButton.disabled = false;
+            clearButton.disabled = false;
+            playAgainButton.classList.add('hidden');
+            
+            // メッセージ要素のテキストをクリアし、色クラスとhiddenクラスを確実に初期化
+            gameStatusMessageElement.textContent = ''; // テキスト内容をクリア
+            gameStatusMessageElement.classList.add('hidden');
+            gameStatusMessageElement.classList.remove('text-green-600', 'text-red-600');
+
+            puzzleCreationSection.classList.add('hidden');
+            gamePlaySection.classList.remove('hidden');
+
+            shuffledWords = currentPuzzle.groups.flat();
+            shuffleArray(shuffledWords);
+
+            renderWordGrid();
+        }
+
+        function renderWordGrid() {
+            wordGrid.innerHTML = '';
+
+            const sortedGuessedGroups = [...guessedGroupsIndices].sort((a,b) => a - b);
+            sortedGuessedGroups.forEach(groupIndex => {
+                const category = currentPuzzle.categories[groupIndex];
+                const words = currentPuzzle.groups[groupIndex];
+                const color = groupColors[groupIndex]; // ここでJavaScriptのgroupColors配列から色を取得
+
+                const groupItem = document.createElement('div');
+                groupItem.classList.add('group-item');
+                groupItem.style.backgroundColor = color.bg;
+                groupItem.style.color = color.text;
+                groupItem.style.borderColor = color.border;
+                groupItem.style.borderWidth = '1px'; // Border width for solved groups remains 1px for clarity
+
+                const categoryTitle = document.createElement('div');
+                categoryTitle.classList.add('category-title', 'font-bold');
+                categoryTitle.textContent = category;
+
+                const wordDisplay = document.createElement('div');
+                wordDisplay.classList.add('word-display');
+                wordDisplay.textContent = words.map(w => w.toUpperCase()).join(', ');
+
+                groupItem.appendChild(categoryTitle);
+                groupItem.appendChild(wordDisplay);
+                wordGrid.appendChild(groupItem);
+            });
+
+            const remainingWords = currentPuzzle.groups.flat().filter(word => {
+                return !guessedGroupsIndices.some(groupIndex => currentPuzzle.groups[groupIndex].includes(word));
+            });
+            shuffleArray(remainingWords);
+            
+            remainingWords.forEach(word => {
+                const wordItem = document.createElement('div');
+                wordItem.classList.add('word-item');
+                wordItem.textContent = word.toUpperCase();
+                wordItem.addEventListener('click', () => toggleWordSelection(word.toLowerCase(), wordItem));
+                wordGrid.appendChild(wordItem);
+            });
+        }
+
+        function toggleWordSelection(word, element) {
+            const index = selectedWords.indexOf(word);
+            if (index > -1) {
+                selectedWords.splice(index, 1);
+                element.classList.remove('selected');
+            } else if (selectedWords.length < 4) {
+                selectedWords.push(word);
+                element.classList.add('selected');
+            }
+
+            submitButton.disabled = selectedWords.length !== 4;
+        }
+
+        function clearSelection() {
+            selectedWords = [];
+            document.querySelectorAll('.word-item').forEach(item => {
+                if (!item.classList.contains('guessed')) {
+                    item.classList.remove('selected');
+                }
+            });
+            submitButton.disabled = true;
+        }
+
+        function shuffleBoard() {
+            const activeWordElements = Array.from(wordGrid.children).filter(item => item.classList.contains('word-item'));
+            const currentWordsOnBoard = activeWordElements.map(item => item.textContent.toLowerCase());
+            shuffleArray(currentWordsOnBoard);
+
+            activeWordElements.forEach((item, index) => {
+                item.textContent = currentWordsOnBoard[index].toUpperCase();
+            });
+            clearSelection();
+        }
+        function checkGuess() {
+            if (selectedWords.length !== 4) return;
+
+            const sortedSelected = [...selectedWords].sort();
+            let isCorrect = false;
+            let guessedGroupIndex = -1;
+            let isNearMiss = false;
+
+            for (let i = 0; i < currentPuzzle.groups.length; i++) {
+                const sortedGroup = [...currentPuzzle.groups[i]].sort();
+                if (JSON.stringify(sortedSelected) === JSON.stringify(sortedGroup) && !guessedGroupsIndices.includes(i)) {
+                    isCorrect = true;
+                    guessedGroupIndex = i;
+                    break;
+                }
+            }
+
+            // まず、メッセージをリセットし、非表示にする
+            gameStatusMessageElement.classList.add('hidden'); // ここで常に非表示にする
+            gameStatusMessageElement.classList.remove('text-red-600', 'text-green-600'); // 色クラスも削除
+            gameStatusMessageElement.textContent = ''; // メッセージ内容もクリア
+
+            if (isCorrect) {
+                correctGroupsCount++;
+                guessedGroupsIndices.push(guessedGroupIndex);
+
+                renderWordGrid();
+                clearSelection();
+            } else {
+                for (let i = 0; i < currentPuzzle.groups.length; i++) {
+                    const currentGroup = currentPuzzle.groups[i];
+                    if (!guessedGroupsIndices.includes(i)) {
+                        let matchCount = 0;
+                        for (const selectedWord of selectedWords) {
+                            if (currentGroup.includes(selectedWord)) {
+                                matchCount++;
+                            }
+                        }
+                        if (matchCount === 3) {
+                            isNearMiss = true;
+                            break;
+                        }
+                    }
+                }
+
+                incorrectGuesses++;
+
+                if (isNearMiss) {
+                    gameStatusMessageElement.textContent = 'One Way ...';
+                    gameStatusMessageElement.classList.remove('hidden'); // ニアミスの時だけ表示
+                    gameStatusMessageElement.classList.add('text-red-600'); // 赤色にする
+                } else {
+                    // ニアミスではない不正解の場合、メッセージは非表示のまま
+                    // gameStatusMessageElement.textContent は空のまま
+                }
+                
+                clearSelection();
+            }
+
+            if (correctGroupsCount === 4) {
+                gameStatusMessageElement.textContent = 'Excellent work! You did it!';
+                gameStatusMessageElement.classList.remove('hidden'); // 全て正解したら表示
+                gameStatusMessageElement.classList.remove('text-red-600');
+                gameStatusMessageElement.classList.add('text-green-600');
+                endGame(true);
+            }
+        }
+
+        function endGame(won) {
+            submitButton.disabled = true;
+            shuffleButton.disabled = true;
+            clearButton.disabled = true;
+            playAgainButton.classList.remove('hidden');
+            
+            // ★ここを修正しました★
+            // 勝利していない場合（wonがfalseの場合）のみ、メッセージをクリア・非表示にする
+            if (!won) {
+                gameStatusMessageElement.textContent = ''; // テキスト内容をクリア
+                gameStatusMessageElement.classList.add('hidden'); // hiddenクラスを追加
+                gameStatusMessageElement.classList.remove('text-green-600', 'text-red-600'); // 色クラスを削除
+            }
+
+            document.querySelectorAll('.word-item').forEach(item => {
+                item.style.pointerEvents = 'none';
+                item.classList.remove('selected');
+            });
+
+            // ゲーム終了時にまだ当てられていないグループも表示する
+            for (let i = 0; i < currentPuzzle.groups.length; i++) {
+                if (!guessedGroupsIndices.includes(i)) {
+                    guessedGroupsIndices.push(i);
+                }
+            }
+            renderWordGrid(); // 全てのグループが表示されるように再描画
+        }
+
+        function createPuzzle() {
+            puzzleErrorMessage.classList.add('hidden');
+            let parsedGroups = [];
+            let parsedCategories = [];
+            let wordsUsedInGroups = new Set();
+
+            for (let i = 0; i < 4; i++) {
+                const groupWordsRaw = groupWordsInputs[i].value.trim();
+                const groupCategory = groupCategoryInputs[i].value.trim();
+
+                if (!groupWordsRaw || !groupCategory) {
+                    puzzleErrorMessage.textContent = `error: group ${i+1} needs words and name`;
+                    puzzleErrorMessage.classList.remove('hidden');
+                    return;
+                }
+
+                const groupWords = [...new Set(groupWordsRaw.split(/[\s,]+/).filter(w => w.length > 0).map(w => w.toLowerCase()))];
+                
+                if (groupWords.length !== 4) {
+                    puzzleErrorMessage.textContent = `error: group ${i+1} needs 4 words.current: ${groupWords.length}`;
+                    puzzleErrorMessage.classList.remove('hidden');
+                    return;
+                }
+
+                if (groupWords.some(word => wordsUsedInGroups.has(word))) {
+                    puzzleErrorMessage.textContent = `error: word '${groupWords.find(word => wordsUsedInGroups.has(word))}' used before.It can use only one time `;
+                    puzzleErrorMessage.classList.remove('hidden');
+                    return;
+                }
+
+                groupWords.forEach(word => wordsUsedInGroups.add(word));
+                parsedGroups.push(groupWords);
+                parsedCategories.push(groupCategory);
+            }
+
+            if (wordsUsedInGroups.size !== 16) {
+                puzzleErrorMessage.textContent = `error: It needs 16 words.current: ${wordsUsedInGroups.size}`;
+                puzzleErrorMessage.classList.remove('hidden');
+                return;
+            }
+
+            currentPuzzle = {
+                groups: parsedGroups,
+                categories: parsedCategories
+            };
+
+            initializeGame();
+        }
+
+        createPuzzleButton.addEventListener('click', createPuzzle);
+        submitButton.addEventListener('click', checkGuess);
+        shuffleButton.addEventListener('click', shuffleBoard); 
+        clearButton.addEventListener('click', clearSelection);
+        playAgainButton.addEventListener('click', () => {
+            // パズル作成セクションに戻る前に、入力フィールドをクリア
+            groupWordsInputs.forEach(input => input.value = '');
+            groupCategoryInputs.forEach(input => input.value = '');
+            puzzleErrorMessage.classList.add('hidden');
+
+            // 画面をパズル作成セクションに切り替える
+            puzzleCreationSection.classList.remove('hidden');
+            gamePlaySection.classList.add('hidden');
+        });
+
+        // ページロード時にパズル作成セクションを表示し、ゲームプレイセクションを隠す
+        puzzleCreationSection.classList.remove('hidden');
+        gamePlaySection.classList.add('hidden');
+    </script>
+</body>
+</html>
